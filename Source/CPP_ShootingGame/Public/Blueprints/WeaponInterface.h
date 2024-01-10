@@ -27,5 +27,11 @@ public:
 	void EventReload();
 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void EventResetAmmo();
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
 	void EventPickUP(ACharacter* pOwnChar);
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void EventDrop(ACharacter* pOwnChar);
 };

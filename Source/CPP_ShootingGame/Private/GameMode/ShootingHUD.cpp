@@ -28,6 +28,8 @@ void AShootingHUD::BindMyPlayerState()
 		{
 			ps->m_Dele_UpdateHP.AddDynamic(this, &AShootingHUD::OnUpdateMyHP);
 			OnUpdateMyHP(ps->m_CurHP, 100.0f);
+			ps->m_Dele_UpdateMag.AddDynamic(this, &AShootingHUD::OnUpdateMyMag);
+			OnUpdateMyMag(ps->m_Mag);
 			GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FString::Printf(TEXT("BindSuccess")));
 			return;
 		}
@@ -39,5 +41,13 @@ void AShootingHUD::BindMyPlayerState()
 }
 
 void AShootingHUD::OnUpdateMyHP_Implementation(float CurHP, float MaxHP)
+{
+}
+
+void AShootingHUD::OnUpdateMyAmmo_Implementation(int Ammo)
+{
+}
+
+void AShootingHUD::OnUpdateMyMag_Implementation(int Mag)
 {
 }

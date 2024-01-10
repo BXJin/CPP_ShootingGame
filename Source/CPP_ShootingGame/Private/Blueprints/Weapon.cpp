@@ -6,9 +6,10 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "GameMode/ShootingHUD.h"
 
 // Sets default values
-AWeapon::AWeapon()
+AWeapon::AWeapon() : m_Ammo(30)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -26,7 +27,7 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AWeapon, m_pOwnChar);
+	DOREPLIFETIME(AWeapon, m_Ammo);
 }
 
 // Called when the game starts or when spawned
@@ -50,6 +51,8 @@ void AWeapon::EventTrigger_Implementation()
 
 void AWeapon::EventShot_Implementation()
 {
+	if(IsCanShoot() == false) return;
+
 	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), m_FireEffect,
 		WeaponMesh->GetSocketLocation("muzzle"),
 		WeaponMesh->GetSocketRotation("muzzle"),
@@ -59,6 +62,8 @@ void AWeapon::EventShot_Implementation()
 		WeaponMesh->GetSocketLocation("muzzle") );
 
 	APlayerController* pPlayer0 = GetWorld()->GetFirstPlayerController();
+	if (pPlayer0 != m_pOwnChar->GetController())
+		return;
 
 	FVector CameraLoc = pPlayer0->PlayerCameraManager->GetCameraLocation();
 	FVector CameraForward = pPlayer0->PlayerCameraManager->GetActorForwardVector();
@@ -76,12 +81,30 @@ void AWeapon::EventReload_Implementation()
 void AWeapon::EventPickUP_Implementation(ACharacter* pOwnChar)
 {
 	m_pOwnChar = pOwnChar;
+	m_pOwnChar->bUseControllerRotationYaw = true;
 	WeaponMesh->SetSimulatePhysics(false);
 	AttachToComponent(pOwnChar->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("weapon"));
+
+	OnUpdateAmmoToHud(m_Ammo);
+}
+
+void AWeapon::EventResetAmmo_Implementation()
+{
+	SetAmmo(30);
+}
+
+void AWeapon::EventDrop_Implementation(ACharacter* pOwnChar)
+{
+	OnUpdateAmmoToHud(0);
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	WeaponMesh->SetSimulatePhysics(true);
+	m_pOwnChar->bUseControllerRotationYaw = false;
+	m_pOwnChar = nullptr;
 }
 
 void AWeapon::ReqShoot_Implementation(FVector vStart, FVector vEnd)
 {
+	if (false == UseAmmo()) return;
 	FHitResult result;
 	//Trace에 맞을 것들 추가
 	FCollisionObjectQueryParams collisionObjParams;
@@ -117,5 +140,48 @@ float AWeapon::GetFireStartLength()
 		return 0.0f;
 	}
 	return pArm->TargetArmLength + 100.0f;
+}
+
+bool AWeapon::IsCanShoot()
+{
+	if (m_Ammo <= 0)
+		return false;
+	return true;
+}
+
+bool AWeapon::UseAmmo()
+{
+	if (IsCanShoot() == false) return false;
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("AmmoUsed"));
+	m_Ammo = m_Ammo - 1;
+	m_Ammo = FMath::Clamp(m_Ammo, 0, 30);
+
+	OnRep_Ammo();
+
+	return true;
+}
+
+void AWeapon::SetAmmo(int Ammo)
+{
+	m_Ammo = Ammo;
+	OnRep_Ammo();   
+}
+
+void AWeapon::OnUpdateAmmoToHud(int Ammo)
+{
+	if (m_pOwnChar == nullptr) return;
+
+	APlayerController* pPlayer0 = GetWorld()->GetFirstPlayerController();
+	if (m_pOwnChar->GetController() != pPlayer0) return;
+
+	AShootingHUD* pHud = Cast<AShootingHUD>(pPlayer0->GetHUD());
+	if (pHud == nullptr) return;
+
+	pHud->OnUpdateMyAmmo(Ammo);
+}
+
+void AWeapon::OnRep_Ammo()
+{
+	OnUpdateAmmoToHud(m_Ammo);
 }
 

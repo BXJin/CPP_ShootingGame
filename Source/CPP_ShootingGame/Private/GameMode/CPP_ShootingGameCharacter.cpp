@@ -14,6 +14,8 @@
 #include "Net/UnrealNetwork.h" // DOREPLIFETIME 사용을 위해 추가
 #include "GameMode/ShootingPlayerState.h"
 #include "Blueprints/Weapon.h"
+#include "Blueprint/UserWidget.h"
+#include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -79,6 +81,15 @@ void ACPP_ShootingGameCharacter::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
+
+	NameTagWidget = CreateWidget<UUserWidget>(GetWorld(), NameTagClass);
+	NameTagWidget->AddToViewport();
+	
+	FTimerManager& timerManager = GetWorld()->GetTimerManager();
+	timerManager.SetTimer(th_Nametag, this,
+		&ACPP_ShootingGameCharacter::EventUpdateNametag, 0.01f, true);
+
+	BindPlayerState();
 }
 
 void ACPP_ShootingGameCharacter::Tick(float DeltaSeconds)
@@ -121,14 +132,28 @@ void ACPP_ShootingGameCharacter::ReqPressF_Implementation()
 		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("NoActor"));
 		return;
 	}
+	if (m_EquipWeapon != nullptr)
+	{
+		m_EquipWeapon->SetOwner(nullptr);
+	}
 
-	pNearestActor->SetOwner(GetController());
+	pNearestActor->SetOwner(GetController()); // 액터의 소유권이 없으면 클라이언트가 서버로 메시지를 보낼 수 없다
 	ResPressF(pNearestActor);
 }
 
 void ACPP_ShootingGameCharacter::ResPressF_Implementation(AActor* PickUpActor)
 {
 	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("PickUpActor"));
+
+	if (m_EquipWeapon != nullptr)
+	{
+		IWeaponInterface* InterfaceObj = Cast<IWeaponInterface>(m_EquipWeapon);
+		if (nullptr == InterfaceObj)
+			return;
+		InterfaceObj->Execute_EventDrop(m_EquipWeapon, this);
+		m_EquipWeapon = nullptr;
+	}
+
 	m_EquipWeapon = PickUpActor;
 	IWeaponInterface* InterfaceObj = Cast<IWeaponInterface>(m_EquipWeapon);
 	if (nullptr == InterfaceObj)
@@ -170,6 +195,22 @@ void ACPP_ShootingGameCharacter::ResReload_Implementation()
 	//UGameplayStatics::SpawnSound2D
 }
 
+void ACPP_ShootingGameCharacter::ReqDrop_Implementation()
+{
+	if (!IsValid(m_EquipWeapon)) return;
+	m_EquipWeapon->SetOwner(nullptr);
+	ResDrop();
+}
+
+void ACPP_ShootingGameCharacter::ResDrop_Implementation()
+{
+	IWeaponInterface* InterfaceObj = Cast<IWeaponInterface>(m_EquipWeapon);
+	if (nullptr == InterfaceObj)
+		return;
+	InterfaceObj->Execute_EventDrop(m_EquipWeapon, this);
+	m_EquipWeapon = nullptr;
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Input
 
@@ -198,6 +239,9 @@ void ACPP_ShootingGameCharacter::SetupPlayerInputComponent(UInputComponent* Play
 
 		// Reload
 		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ACPP_ShootingGameCharacter::Reload);
+
+		// Drop
+		EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &ACPP_ShootingGameCharacter::Drop);
 	}
 	else
 	{
@@ -259,6 +303,13 @@ void ACPP_ShootingGameCharacter::Reload(const FInputActionValue& Value)
 	ReqReload();
 }
 
+void ACPP_ShootingGameCharacter::Drop(const FInputActionValue& Value)
+{
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, TEXT("Drop G"));
+	ReqDrop();
+}
+
+
 void ACPP_ShootingGameCharacter::EquipTestWeapon(TSubclassOf<class AWeapon> WeaponClass)
 {
 	if (!HasAuthority()) return;
@@ -291,6 +342,7 @@ AActor* ACPP_ShootingGameCharacter::FindNearestWeapon()
 	AActor* pNearestActor = nullptr;
 	for (auto pTarget : actors)
 	{
+		if (m_EquipWeapon == pTarget) continue;
 		double dist = FVector::Distance(GetActorLocation(), pTarget->GetActorLocation());
 		if (dist >= nearestDist)
 			continue;
@@ -299,4 +351,54 @@ AActor* ACPP_ShootingGameCharacter::FindNearestWeapon()
 	}
 
 	return pNearestActor;
+}
+
+void ACPP_ShootingGameCharacter::EventUpdateNametag_Implementation()
+{
+}
+
+void ACPP_ShootingGameCharacter::EventUpdateNametagHp_Implementation(float CurHp, float MaxHp)
+{
+}
+
+void ACPP_ShootingGameCharacter::BindPlayerState()
+{
+	AShootingPlayerState* pPS = Cast<AShootingPlayerState>(GetPlayerState());
+	if (IsValid(pPS))
+	{
+		pPS->m_Dele_UpdateHP.AddDynamic(this, &ACPP_ShootingGameCharacter::EventUpdateNametagHp);
+		EventUpdateNametagHp(pPS->m_CurHP, 100);
+		return;
+	}
+
+	FTimerManager& timerManager = GetWorld()->GetTimerManager();
+	timerManager.SetTimer(th_BindPlayerState, this, 
+		&ACPP_ShootingGameCharacter::BindPlayerState, 0.01f, false);
+}
+
+void ACPP_ShootingGameCharacter::EventGetItem_Implementation(EItemType itemType)
+{
+	switch (itemType)
+	{
+	case EItemType::IT_Mag:
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Blue, TEXT("EventGetItem Mag"));
+		AShootingPlayerState* ps = Cast<AShootingPlayerState>(GetPlayerState());
+		if (!IsValid(ps)) return;
+		ps->AddMag();
+	}
+	break;
+
+	case EItemType::IT_HEAL:
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Blue, TEXT("EventGetItem Heal"));
+		AShootingPlayerState* ps = Cast<AShootingPlayerState>(GetPlayerState());
+		if (!IsValid(ps)) return;
+		ps->AddHeal(100);
+	}
+	break;
+
+	default:
+		break;
+	}
 }

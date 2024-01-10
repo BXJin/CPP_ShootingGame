@@ -8,6 +8,11 @@ public class CPP_ShootingGame : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG" });
-	}
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", 
+			"InputCore", "EnhancedInput", "UMG", "BaseItem", "OnlineSubsystem", "OnlineSubsystemUtils" });
+
+        DynamicallyLoadedModuleNames.Add("OnlineSubsystemNull");
+
+		PublicIncludePaths.AddRange(new string[] { "CPP_ShootingGame" });
+    }
 }

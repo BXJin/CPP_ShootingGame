@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Iteminterface.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
 #include "CPP_ShootingGameCharacter.generated.h"
@@ -16,7 +17,7 @@ struct FInputActionValue;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS(config=Game)
-class ACPP_ShootingGameCharacter : public ACharacter
+class ACPP_ShootingGameCharacter : public ACharacter, public IItemInterface
 {
 	GENERATED_BODY()
 
@@ -53,10 +54,15 @@ class ACPP_ShootingGameCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* PressFAction;
 
-	/** PressF Input Action */
+	/** Reload Input Action */
 	//UPROPERTY 언리얼 내에서 사용할 수 있는 프로퍼티를 만들겠다, 빈칸이 생김 틀 생김
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ReloadAction;
+
+	/** Drop Input Action */
+	//UPROPERTY 언리얼 내에서 사용할 수 있는 프로퍼티를 만들겠다, 빈칸이 생김 틀 생김
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* DropAction;
 
 public:
 	ACPP_ShootingGameCharacter();
@@ -78,6 +84,9 @@ protected:
 
 	/** Called for Reload input */
 	void Reload(const FInputActionValue& Value);
+
+	/** Called for Drop input */
+	void Drop(const FInputActionValue& Value);
 
 protected:
 	// APawn interface
@@ -120,6 +129,12 @@ public:
 	UFUNCTION(NetMulticast, Reliable) // MultiCast, 모든 클라이언트에 전달
 	void ResReload();
 
+	UFUNCTION(Server, Reliable) //Run On Server
+	void ReqDrop();
+
+	UFUNCTION(NetMulticast, Reliable) // MultiCast, 모든 클라이언트에 전달
+	void ResDrop();
+
 public:
 	UFUNCTION(BlueprintCallable)
 	void EquipTestWeapon(TSubclassOf<class AWeapon> WeaponClass);
@@ -128,6 +143,26 @@ public:
 	void TestWeaponSetOwner();
 
 	AActor* FindNearestWeapon();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void EventUpdateNametag();
+
+	void EventUpdateNametag_Implementation();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
+	void EventUpdateNametagHp(float CurHp, float MaxHp);
+
+	void EventUpdateNametagHp_Implementation(float CurHp, float MaxHp);
+
+	void BindPlayerState();
+
+public :
+	//ItemInterface
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void EventGetItem(EItemType itemType);
+
+	virtual void EventGetItem_Implementation(EItemType itemType) override;
+
 
 public :
 	//변수의 Replicated
@@ -141,6 +176,16 @@ public :
 
 	//임시
 	FTimerHandle th_BindSetOwner;
+
+	UPROPERTY(EditAnyWhere, BlueprintReadWrite)
+	TSubclassOf<class UUserWidget> NameTagClass;
+
+	UPROPERTY(BlueprintReadWrite)
+	UUserWidget* NameTagWidget;
+
+	FTimerHandle th_Nametag;
+
+	FTimerHandle th_BindPlayerState;
 };
 
 

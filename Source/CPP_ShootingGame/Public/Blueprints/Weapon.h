@@ -7,6 +7,8 @@
 #include "GameFramework/Actor.h"
 #include "Weapon.generated.h"
 
+//DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParams(FDele_UpdateAmmo, int, Ammo);
+
 UCLASS()
 class CPP_SHOOTINGGAME_API AWeapon : public AActor, public IWeaponInterface
 {
@@ -44,6 +46,16 @@ public:
 	void EventPickUP(ACharacter* pOwnChar);
 	virtual void EventPickUP_Implementation(ACharacter* pOwnChar) override;
 
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void EventResetAmmo();
+
+	virtual void EventResetAmmo_Implementation() override;
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void EventDrop(ACharacter* pOwnChar);
+
+	virtual void EventDrop_Implementation(ACharacter* pOwnChar) override;
+
 public:
 	UFUNCTION(Server, Reliable)
 	void ReqShoot(FVector vStart, FVector vEnd);
@@ -51,11 +63,21 @@ public:
 public:
 	float GetFireStartLength();
 
+	UFUNCTION(BlueprintPure)
+	bool IsCanShoot();
+
+	bool UseAmmo();
+
+	void SetAmmo(int Ammo);
+
+	UFUNCTION(BlueprintCallable)
+	void OnUpdateAmmoToHud(int Ammo);
+
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	class UStaticMeshComponent* WeaponMesh;
 
-	UPROPERTY(Replicated, BlueprintReadWrite)
+	UPROPERTY(BlueprintReadWrite)
 	ACharacter* m_pOwnChar;
 
 	//EditAnywhere Detail창에서 수정가능, BlueprintReadWrite (Get, Set) 가능 ReadOnly (Get) 만
@@ -71,4 +93,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	USoundBase* m_SoundBase;
+
+	UFUNCTION()
+	void OnRep_Ammo();
+
+	UPROPERTY(ReplicatedUsing = OnRep_Ammo)
+	int m_Ammo;
 };
