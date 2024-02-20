@@ -78,4 +78,61 @@ public:
 	*	@param bWasSuccessful true if the async action completed without error, false if there was an error
 	*/
 	void OnFindSessionsComplete(bool bWasSuccessful);
+
+public:
+	//------------------------------------------------[ Join Session ]
+	bool JoinSession(TSharedPtr<const FUniqueNetId> UserId, FName SessionName, const FOnlineSessionSearchResult& SearchResult);
+
+	/** Delegate for joining a session */
+	FOnJoinSessionCompleteDelegate OnJoinSessionCompleteDelegate;
+
+	/** Handle to registered delegate for joining a session */
+	FDelegateHandle OnJoinSessionCompleteDelegateHandle;
+
+	/**
+	*	Delegate fired when a session join request has completed
+	*
+	*	@param SessionName the name of the session this callback is for
+	*	@param bWasSuccessful true if the async action completed without error, false if there was an error
+	*/
+	void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
+
+
+public:
+	//------------------------------------------------[ Destroy Session ]
+	/** Delegate for destroying a session */
+	FOnDestroySessionCompleteDelegate OnDestroySessionCompleteDelegate;
+
+	/** Handle to registered delegate for destroying a session */
+	FDelegateHandle OnDestroySessionCompleteDelegateHandle;
+
+	/**
+	*	Delegate fired when a destroying an online session has completed
+	*
+	*	@param SessionName the name of the session this callback is for
+	*	@param bWasSuccessful true if the async action completed without error, false if there was an error
+	*/
+	virtual void OnDestroySessionComplete(FName SessionName, bool bWasSuccessful);
+
+	virtual void Shutdown() override;
+
+public:
+	//------------------------------------------------[ BlueprintCall Fuction ]
+	UFUNCTION(BlueprintCallable, Category = "Network|Test")
+	void StartOnlineGame();
+
+	UFUNCTION(BlueprintCallable, Category = "Network|Test")
+	void FindOnlineGames();
+
+	UFUNCTION(BlueprintCallable, Category = "Network|Test")
+	void JoinOnlineGame(FBlueprintSessionResult SessionResults);
+
+	UFUNCTION(BlueprintCallable, Category = "Network|Test")
+	void DestroySessionAndLeaveGame();
+
+public:
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+	void OnFindSessionResult(const TArray<FBlueprintSessionResult>& SessionResults);
+
+	void OnFindSessionResult_Implementation(const TArray<FBlueprintSessionResult>& SessionResults);
 };
